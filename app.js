@@ -5,6 +5,15 @@ const passport = require('passport');
 const StravaStrategy = require('passport-strava-oauth2').Strategy;
 const path = require('path');
 
+// Fail fast if required env vars are missing
+const REQUIRED_ENV = ['STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET'];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error(`[Startup Error] Missing required environment variables: ${missing.join(', ')}`);
+  console.error('Set them in your Render dashboard under Environment > Environment Variables.');
+  process.exit(1);
+}
+
 const app = express();
 
 // View engine
