@@ -44,8 +44,7 @@ passport.use(new StravaStrategy(
   {
     clientID: process.env.STRAVA_CLIENT_ID,
     clientSecret: process.env.STRAVA_CLIENT_SECRET,
-    callbackURL: process.env.STRAVA_CALLBACK_URL || 'http://localhost:3000/auth/strava/callback',
-    scope: ['read', 'activity:read_all']
+    callbackURL: process.env.STRAVA_CALLBACK_URL || 'http://localhost:3000/auth/strava/callback'
   },
   (accessToken, refreshToken, params, profile, done) => {
     const user = {
