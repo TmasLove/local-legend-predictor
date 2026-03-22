@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Segments – Local Legend Predictor</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="dashboard-body">
+
+  <!-- Nav -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <span class="bike-sm">🚴</span>
+        <span>Local Legend <span class="orange">Predictor</span></span>
+      </div>
+      <div class="nav-right">
+        <% if (user && user.photo) { %>
+          <img class="avatar" src="<%= user.photo %>" alt="<%= user.name %>">
+        <% } %>
+        <span class="nav-name"><%= user ? user.firstName || user.name : '' %></span>
+        <a href="/logout" class="btn-logout">Log out</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="page-header">
+      <h1>Your Top Segments <span class="badge">Last 90 days</span></h1>
+      <p class="sub">Based on your Strava activities. How close are you to the crown?</p>
+    </div>
+
+    <% if (error) { %>
+      <div class="alert alert-warning" style="max-width:760px;margin:0 auto 2rem;">
+        ⚠️  <%= error %>
+      </div>
+    <% } %>
+
+    <% if (segments && segments.length > 0) { %>
+      <div class="segments-grid">
+        <% segments.forEach((seg, idx) => { %>
+          <div class="segment-card <%= seg.isLegend ? 'is-legend' : '' %>">
+
+            <!-- Rank badge -->
+            <div class="rank-badge">#<%= idx + 1 %></div>
+
+            <!-- Legend crown if user IS the legend -->
+            <% if (seg.isLegend) { %>
+              <div class="legend-crown">👑 YOU ARE THE LOCAL LEGEND</div>
+            <% } %>
+
+            <h2 class="seg-name"><%= seg.name %></h2>
+
+            <% if (seg.rateLimited) { %>
+              <p class="rate-limit-msg">⏳ Strava rate limit reached – legend data unavailable for this segment.</p>
+            <% } else { %>
+
+              <!-- Stats row -->
+              <div class="stats-row">
+                <div class="stat">
+                  <div class="stat-label">👑 Legend</div>
+                  <div class="stat-value orange"><%= seg.legendCount %></div>
+                  <div class="stat-name"><%= seg.legendName %></div>
+                </div>
+                <div class="stat-divider">vs</div>
+                <div class="stat">
+                  <div class="stat-label">🚴 Your Efforts</div>
+                  <div class="stat-value <%= seg.isLegend ? 'green' : '' %>"><%= seg.userCount %></div>
+                  <div class="stat-name"><%= user.firstName || user.name %></div>
+                </div>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="progress-container">
+                <div class="progress-track">
+                  <div
+                    class="progress-fill"
+                    style="width: <%= seg.progress %>%"
+                    title="<%= seg.progress %>%"
+                  ></div>
+                </div>
+                <span class="progress-pct"><%= seg.progress %>%</span>
+              </div>
+
+              <!-- Efforts needed -->
+              <div class="efforts-msg">
+                <% if (seg.isLegend) { %>
+                  <span class="msg-legend">You're the Local Legend! Keep it up! 🏆</span>
+                <% } else if (seg.effortsNeeded === 1) { %>
+                  <span class="msg-close">Just <strong>1 more ride</strong> to dethrone <%= seg.legendName %>!</span>
+                <% } else { %>
+                  <span class="msg-normal">Need <strong><%= seg.effortsNeeded %> more rides</strong> to dethrone <%= seg.legendName %></span>
+                <% } %>
+              </div>
+
+            <% } %>
+
+            <!-- Actions -->
+            <div class="card-actions">
+              <a
+                href="/card/<%= seg.id %>"
+                class="btn-download"
+                target="_blank"
+                rel="noopener"
+              >
+                📥 Download Share Card
+              </a>
+              <button
+                class="btn-preview"
+                onclick="previewCard('<%= seg.id %>', this)"
+              >
+                🖼 Preview
+              </button>
+            </div>
+
+            <!-- Inline preview area -->
+            <div class="preview-area" id="preview-<%= seg.id %>" style="display:none">
+              <img class="preview-img" src="" alt="Share card preview" loading="lazy">
+              <p class="preview-hint">Right-click the image to save, or use the download button above.</p>
+            </div>
+
+          </div>
+        <% }) %>
+      </div>
+
+    <% } else if (!error) { %>
+      <div class="empty-state">
+        <div class="empty-icon">🚴</div>
+        <h2>No segments found</h2>
+        <p>Make sure your recent Strava activities have segment efforts enabled and are set to public.</p>
+        <a href="/dashboard" class="btn-refresh">🔄 Refresh</a>
+      </div>
+    <% } %>
+
+  </main>
+
+  <footer class="footer">
+    <p>🚴 Made with <span class="orange">tomcat.png</span> &nbsp;·&nbsp; Data sourced from Strava API &nbsp;·&nbsp; Last 90 days only</p>
+  </footer>
+
+  <script>
+    async function previewCard(segmentId, btn) {
+      const area = document.getElementById('preview-' + segmentId);
+      const img = area.querySelector('.preview-img');
+
+      if (area.style.display !== 'none') {
+        area.style.display = 'none';
+        btn.textContent = '🖼 Preview';
+        return;
+      }
+
+      btn.textContent = '⏳ Generating…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/card-preview/' + segmentId);
+        if (!res.ok) throw new Error('Failed');
+        const blob = await res.blob();
+        img.src = URL.createObjectURL(blob);
+        area.style.display = 'block';
+        btn.textContent = '✕ Hide';
+      } catch (e) {
+        btn.textContent = '❌ Error – try again';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

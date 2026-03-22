@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Legend Predictor</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="login-body">
+  <div class="login-container">
+    <div class="login-card">
+      <!-- Logo / Hero -->
+      <div class="login-hero">
+        <div class="bike-icon">🚴</div>
+        <h1>Local Legend<br><span class="orange">Predictor</span></h1>
+        <p class="tagline">Find out how many more rides it takes<br>to claim your crown.</p>
+      </div>
+
+      <!-- Flash message -->
+      <% if (message) { %>
+        <div class="alert alert-warning">
+          ⚠️  <%= message %>
+        </div>
+      <% } %>
+
+      <!-- Strava Login Button -->
+      <a href="/auth/strava" class="btn-strava">
+        <svg class="strava-logo" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116z"/>
+          <path d="M11.16 8.71H8.397L15.387 0 22.377 8.71h-2.763l-4.227-5.766-4.227 5.766z"/>
+        </svg>
+        Connect with Strava
+      </a>
+
+      <!-- Features list -->
+      <div class="features">
+        <div class="feature-item">
+          <span class="feature-icon">📊</span>
+          <span>See your top 10 segments</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">👑</span>
+          <span>Compare to the current legend</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-icon">📸</span>
+          <span>Download a shareable card</span>
+        </div>
+      </div>
+
+      <p class="disclaimer">
+        We only read your activity data. We never post on your behalf.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
