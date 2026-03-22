@@ -2,7 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
-const StravaStrategy = require('passport-strava-oauth2').Strategy;
+const OAuth2Strategy = require('passport-oauth2');
+const axios = require('axios');
 const path = require('path');
 
 // Fail fast if required env vars are missing
@@ -39,27 +40,41 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Strava OAuth Strategy
-passport.use(new StravaStrategy(
+// Strava OAuth Strategy (using passport-oauth2 directly for full params support)
+const stravaStrategy = new OAuth2Strategy(
   {
+    authorizationURL: 'https://www.strava.com/oauth/authorize',
+    tokenURL: 'https://www.strava.com/oauth/token',
     clientID: process.env.STRAVA_CLIENT_ID,
     clientSecret: process.env.STRAVA_CLIENT_SECRET,
-    callbackURL: process.env.STRAVA_CALLBACK_URL || 'http://localhost:3000/auth/strava/callback'
+    callbackURL: process.env.STRAVA_CALLBACK_URL || 'http://localhost:3000/auth/strava/callback',
+    scope: 'read,activity:read_all',
+    state: true
   },
-  (accessToken, refreshToken, params, profile, done) => {
-    const user = {
-      id: profile.id,
-      name: profile.displayName || `${profile._json.firstname} ${profile._json.lastname}`,
-      firstName: profile._json.firstname,
-      lastName: profile._json.lastname,
-      photo: profile._json.profile_medium || profile._json.profile,
-      accessToken,
-      refreshToken,
-      expiresAt: params.expires_at // Unix timestamp (seconds)
-    };
-    return done(null, user);
+  async (accessToken, refreshToken, params, done) => {
+    try {
+      // Fetch athlete profile from Strava
+      const { data: athlete } = await axios.get('https://www.strava.com/api/v3/athlete', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const user = {
+        id: athlete.id,
+        name: `${athlete.firstname} ${athlete.lastname}`.trim(),
+        firstName: athlete.firstname,
+        lastName: athlete.lastname,
+        photo: athlete.profile_medium || athlete.profile,
+        accessToken,
+        refreshToken,
+        expiresAt: params.expires_at
+      };
+      return done(null, user);
+    } catch (err) {
+      return done(err);
+    }
   }
-));
+);
+stravaStrategy.name = 'strava';
+passport.use(stravaStrategy);
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));

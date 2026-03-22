@@ -18,10 +18,7 @@ router.get('/', (req, res) => {
 // ── Strava OAuth initiation ──────────────────────────────────────────────────
 router.get(
   '/auth/strava',
-  passport.authenticate('strava', {
-    scope: 'read,activity:read_all',
-    approval_prompt: 'auto'
-  })
+  passport.authenticate('strava', { approval_prompt: 'auto' })
 );
 
 // ── Strava OAuth callback ────────────────────────────────────────────────────
