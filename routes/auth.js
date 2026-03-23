@@ -1,5 +1,6 @@
 const express = require('express');
 const passport = require('passport');
+const axios = require('axios');
 
 const router = express.Router();
 
@@ -33,7 +34,23 @@ router.get(
 );
 
 // ── Logout ───────────────────────────────────────────────────────────────────
-router.get('/logout', (req, res, next) => {
+// Also deauthorizes the app from Strava so the connected-athlete slot is freed.
+// This is the only way to recycle the 10-athlete sandbox limit without
+// going through Strava's production review process.
+router.get('/logout', async (req, res, next) => {
+  const accessToken = req.user?.accessToken;
+
+  // Fire-and-forget Strava deauthorize — don't block logout if it fails
+  if (accessToken) {
+    axios.post(
+      'https://www.strava.com/oauth/deauthorize',
+      null,
+      { params: { access_token: accessToken } }
+    ).catch(err => {
+      console.warn('[Logout] Strava deauthorize failed (slot not freed):', err.message);
+    });
+  }
+
   req.logout(err => {
     if (err) return next(err);
     req.session.destroy(() => {
