@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Segments – Local Legend Predictor</title>
+  <title>Your Segments – Personal Effort Tracker</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="dashboard-body">
@@ -13,7 +13,7 @@
     <div class="nav-inner">
       <div class="nav-brand">
         <span class="bike-sm">🚴</span>
-        <span>Local Legend <span class="orange">Predictor</span></span>
+        <span>Personal <span class="orange">Effort Tracker</span></span>
       </div>
       <div class="nav-right">
         <% if (user && user.photo) { %>
@@ -28,7 +28,7 @@
   <main class="main">
     <div class="page-header">
       <h1>Your Top Segments <span class="badge">Last 90 days</span></h1>
-      <p class="sub">Based on your Strava activities. How close are you to the crown?</p>
+      <p class="sub">Your own efforts — set personal goals and track your progress.</p>
     </div>
 
     <% if (error) { %>
@@ -40,61 +40,96 @@
     <% if (segments && segments.length > 0) { %>
       <div class="segments-grid">
         <% segments.forEach((seg, idx) => { %>
-          <div class="segment-card <%= seg.isLegend ? 'is-legend' : '' %>">
+          <div class="segment-card">
 
             <!-- Rank badge -->
             <div class="rank-badge">#<%= idx + 1 %></div>
 
-            <!-- Legend crown if user IS the legend -->
-            <% if (seg.isLegend) { %>
-              <div class="legend-crown">👑 YOU ARE THE LOCAL LEGEND</div>
-            <% } %>
-
             <h2 class="seg-name"><%= seg.name %></h2>
 
-            <% if (seg.rateLimited) { %>
-              <p class="rate-limit-msg">⏳ Strava rate limit reached – legend data unavailable for this segment.</p>
-            <% } else { %>
-
-              <!-- Stats row -->
-              <div class="stats-row">
-                <div class="stat">
-                  <div class="stat-label">👑 Legend</div>
-                  <div class="stat-value orange"><%= seg.legendCount %></div>
-                  <div class="stat-name"><%= seg.legendName %></div>
-                </div>
-                <div class="stat-divider">vs</div>
-                <div class="stat">
-                  <div class="stat-label">🚴 Your Efforts</div>
-                  <div class="stat-value <%= seg.isLegend ? 'green' : '' %>"><%= seg.userCount %></div>
-                  <div class="stat-name"><%= user.firstName || user.name %></div>
-                </div>
+            <!-- Stats row: current vs last year -->
+            <div class="stats-row">
+              <div class="stat">
+                <div class="stat-label">🚴 Your Efforts</div>
+                <div class="stat-value orange"><%= seg.count %></div>
+                <div class="stat-name">Last 90 days</div>
               </div>
 
-              <!-- Progress bar -->
+              <div class="stat-divider">vs</div>
+
+              <div class="stat">
+                <div class="stat-label">📅 Same Period Last Year</div>
+                <div class="stat-value <%= seg.lastYear === 0 ? 'muted' : (seg.count >= seg.lastYear ? 'green' : 'blue') %>">
+                  <%= seg.lastYear || '—' %>
+                </div>
+                <div class="stat-name">
+                  <% if (seg.lastYear > 0) { %>
+                    <% if (seg.count > seg.lastYear) { %>
+                      ↑ <%= seg.count - seg.lastYear %> ahead
+                    <% } else if (seg.count === seg.lastYear) { %>
+                      On pace
+                    <% } else { %>
+                      ↓ <%= seg.lastYear - seg.count %> behind
+                    <% } %>
+                  <% } else { %>
+                    No data
+                  <% } %>
+                </div>
+              </div>
+            </div>
+
+            <!-- Motivation message -->
+            <div class="efforts-msg">
+              <span class="msg-normal"><%= seg.motivation %></span>
+            </div>
+
+            <!-- Goal progress bar -->
+            <% if (seg.goal > 0) { %>
               <div class="progress-container">
                 <div class="progress-track">
                   <div
                     class="progress-fill"
                     style="width: <%= seg.progress %>%"
-                    title="<%= seg.progress %>%"
+                    title="<%= seg.progress %>% of goal"
                   ></div>
                 </div>
                 <span class="progress-pct"><%= seg.progress %>%</span>
               </div>
-
-              <!-- Efforts needed -->
-              <div class="efforts-msg">
-                <% if (seg.isLegend) { %>
-                  <span class="msg-legend">You're the Local Legend! Keep it up! 🏆</span>
-                <% } else if (seg.effortsNeeded === 1) { %>
-                  <span class="msg-close">Just <strong>1 more ride</strong> to dethrone <%= seg.legendName %>!</span>
-                <% } else { %>
-                  <span class="msg-normal">Need <strong><%= seg.effortsNeeded %> more rides</strong> to dethrone <%= seg.legendName %></span>
-                <% } %>
-              </div>
-
+              <p class="goal-label">Goal: <strong><%= seg.goal %> efforts</strong></p>
             <% } %>
+
+            <!-- Goal setting form -->
+            <details class="goal-details">
+              <summary class="goal-summary">
+                <%= seg.goal > 0 ? '✏️ Update goal' : '🎯 Set a goal' %>
+              </summary>
+              <form
+                class="goal-form"
+                action="/goals/<%= seg.id %>"
+                method="POST"
+              >
+                <label for="goal-<%= seg.id %>">Target efforts:</label>
+                <input
+                  id="goal-<%= seg.id %>"
+                  type="number"
+                  name="target"
+                  min="1"
+                  max="999"
+                  value="<%= seg.goal || '' %>"
+                  placeholder="e.g. 10"
+                  class="goal-input"
+                >
+                <button type="submit" class="btn-set-goal">Save</button>
+                <% if (seg.goal > 0) { %>
+                  <button
+                    type="submit"
+                    name="target"
+                    value="0"
+                    class="btn-clear-goal"
+                  >Clear</button>
+                <% } %>
+              </form>
+            </details>
 
             <!-- Actions -->
             <div class="card-actions">
@@ -104,7 +139,7 @@
                 target="_blank"
                 rel="noopener"
               >
-                📥 Download Share Card
+                📥 Download Card
               </a>
               <button
                 class="btn-preview"
@@ -114,10 +149,10 @@
               </button>
             </div>
 
-            <!-- Inline preview area -->
+            <!-- Inline preview -->
             <div class="preview-area" id="preview-<%= seg.id %>" style="display:none">
               <img class="preview-img" src="" alt="Share card preview" loading="lazy">
-              <p class="preview-hint">Right-click the image to save, or use the download button above.</p>
+              <p class="preview-hint">Right-click to save, or use the download button above.</p>
             </div>
 
           </div>
@@ -145,7 +180,7 @@
       <span>Powered by Strava</span>
     </a>
     <span class="footer-divider">·</span>
-    <span>Last 90 days only</span>
+    <span>Your data only — no other athletes</span>
     <span class="footer-divider">·</span>
     <a href="/privacy" class="footer-link">Data &amp; Privacy</a>
   </footer>
@@ -153,7 +188,7 @@
   <script>
     async function previewCard(segmentId, btn) {
       const area = document.getElementById('preview-' + segmentId);
-      const img = area.querySelector('.preview-img');
+      const img  = area.querySelector('.preview-img');
 
       if (area.style.display !== 'none') {
         area.style.display = 'none';

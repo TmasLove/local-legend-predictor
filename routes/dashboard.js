@@ -2,23 +2,49 @@ const express = require('express');
 const {
   ensureValidToken,
   getRecentActivities,
-  aggregateSegmentEfforts,
-  getSegmentLegend,
-  getSegmentDetails
+  getLastYearActivities,
+  aggregateSegmentEfforts
 } = require('../utils/strava');
 const { generateShareCard } = require('../utils/imageGen');
 
 const router = express.Router();
 
-// ── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Pick a motivational message based solely on the user's own data. */
+function buildMotivation(current, lastYear, goal) {
+  const diff = current - lastYear;
+
+  if (goal > 0) {
+    const needed = goal - current;
+    if (needed <= 0) return `Goal crushed! You hit ${goal} efforts 🏆`;
+    if (needed === 1) return `Just 1 more effort to hit your goal of ${goal}!`;
+    return `${needed} more efforts to reach your goal of ${goal}`;
+  }
+
+  if (lastYear === 0) {
+    if (current >= 10) return `${current} efforts and counting — keep it up! 🔥`;
+    return `Great start — ${current} effort${current !== 1 ? 's' : ''} so far!`;
+  }
+
+  if (diff > 0) return `${diff} ahead of last year's pace 🔥`;
+  if (diff === 0) return `Exactly matching last year's pace — push further!`;
+  return `${Math.abs(diff)} more to match last year's ${lastYear} efforts`;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 router.get('/dashboard', ensureValidToken, async (req, res) => {
   try {
     const token = req.user.accessToken;
 
-    // 1. Fetch all activities in the last 90 days (paginated)
-    let activities;
+    // Fetch current 90-day activities and same window last year in parallel
+    let currentActivities, lastYearActivities;
     try {
-      activities = await getRecentActivities(token, 90);
+      [currentActivities, lastYearActivities] = await Promise.all([
+        getRecentActivities(token, 90),
+        getLastYearActivities(token, 90)
+      ]);
     } catch (err) {
       if (err.isRateLimit) {
         return res.render('dashboard', {
@@ -30,7 +56,7 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       throw err;
     }
 
-    if (!activities || activities.length === 0) {
+    if (!currentActivities || currentActivities.length === 0) {
       return res.render('dashboard', {
         user: req.user,
         segments: [],
@@ -38,9 +64,15 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       });
     }
 
-    // 2. Aggregate effort counts per segment
-    const allSegments = aggregateSegmentEfforts(activities);
-    const top10 = allSegments.slice(0, 10);
+    // Aggregate effort counts per segment (user's own data only)
+    const currentMap  = new Map(
+      aggregateSegmentEfforts(currentActivities).map(s => [s.id, s])
+    );
+    const lastYearMap = new Map(
+      aggregateSegmentEfforts(lastYearActivities).map(s => [s.id, s])
+    );
+
+    const top10 = [...currentMap.values()].slice(0, 10);
 
     if (top10.length === 0) {
       return res.render('dashboard', {
@@ -50,77 +82,28 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       });
     }
 
-    // 3. For each top segment, find the Local Legend
-    const userId = String(req.user.id);
-    const segmentResults = [];
+    // Retrieve any saved goals from session
+    const goals = req.session.goals || {};
 
-    for (const seg of top10) {
-      try {
-        // Fetch ranked efforts for this segment (last 90 days)
-        const ranked = await getSegmentLegend(token, seg.id, 90);
+    const segments = top10.map(seg => {
+      const lastYear = lastYearMap.get(seg.id)?.count || 0;
+      const goal     = goals[seg.id] || 0;
+      const progress = goal > 0
+        ? Math.min(100, Math.round((seg.count / goal) * 100))
+        : 0;
 
-        let legendName = 'Unknown';
-        let legendCount = 0;
-        let userCount = 0;
-
-        if (ranked.length > 0) {
-          const legend = ranked[0];
-          legendName = legend.name || 'Unknown';
-          legendCount = legend.count;
-        }
-
-        // Find user's own count in the ranked list (more accurate than activity parsing)
-        const userEntry = ranked.find(e => String(e.id) === userId);
-        userCount = userEntry ? userEntry.count : seg.count; // fall back to aggregated count
-
-        // If legendCount is 0 (API couldn't fetch efforts), fall back to user's own count
-        if (legendCount === 0) {
-          legendCount = userCount;
-          legendName = req.user.name;
-        }
-
-        const effortsNeeded = Math.max(0, legendCount - userCount + 1);
-        const isLegend = userCount >= legendCount;
-        const progress = legendCount > 0
-          ? Math.min(100, Math.round((userCount / legendCount) * 100))
-          : 100;
-
-        segmentResults.push({
-          id: seg.id,
-          name: seg.name,
-          userCount,
-          legendName,
-          legendCount,
-          effortsNeeded: isLegend ? 0 : effortsNeeded,
-          isLegend,
-          progress
-        });
-      } catch (err) {
-        if (err.isRateLimit) {
-          // Rate limited mid-loop: return what we have so far
-          segmentResults.push({
-            id: seg.id,
-            name: seg.name,
-            userCount: seg.count,
-            legendName: '—',
-            legendCount: '—',
-            effortsNeeded: null,
-            isLegend: false,
-            progress: 0,
-            rateLimited: true
-          });
-        } else {
-          // Skip this segment on other errors (e.g. private segment)
-          console.warn(`[Segment ${seg.id}] Skipped: ${err.message}`);
-        }
-      }
-    }
-
-    res.render('dashboard', {
-      user: req.user,
-      segments: segmentResults,
-      error: null
+      return {
+        id:         seg.id,
+        name:       seg.name,
+        count:      seg.count,      // current period (last 90 days)
+        lastYear,                   // same window last year
+        goal,                       // user-defined target (0 = not set)
+        progress,
+        motivation: buildMotivation(seg.count, lastYear, goal)
+      };
     });
+
+    res.render('dashboard', { user: req.user, segments, error: null });
   } catch (err) {
     console.error('[Dashboard Error]', err.message);
     if (err.isRateLimit) {
@@ -137,107 +120,97 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
   }
 });
 
-// ── Generate shareable card PNG ───────────────────────────────────────────────
+// ─── Save / update goal for a segment ────────────────────────────────────────
+
+router.post('/goals/:segmentId', ensureValidToken, (req, res) => {
+  const { segmentId } = req.params;
+  const target = parseInt(req.body.target, 10);
+
+  if (!req.session.goals) req.session.goals = {};
+
+  if (!isNaN(target) && target > 0) {
+    req.session.goals[segmentId] = target;
+  } else {
+    delete req.session.goals[segmentId]; // clear goal if 0 or invalid
+  }
+
+  req.session.save(() => res.redirect('/dashboard'));
+});
+
+// ─── Shareable PNG card ───────────────────────────────────────────────────────
+
 router.get('/card/:segmentId', ensureValidToken, async (req, res) => {
-  const segmentId = req.params.segmentId;
+  const { segmentId } = req.params;
   const token = req.user.accessToken;
 
   try {
-    // Re-fetch segment legend data
-    const ranked = await getSegmentLegend(token, segmentId, 90);
+    const [currentActivities, lastYearActivities] = await Promise.all([
+      getRecentActivities(token, 90),
+      getLastYearActivities(token, 90)
+    ]);
 
-    let legendName = 'Unknown';
-    let legendCount = 0;
-    let userCount = 0;
+    const currentMap  = new Map(aggregateSegmentEfforts(currentActivities).map(s => [s.id, s]));
+    const lastYearMap = new Map(aggregateSegmentEfforts(lastYearActivities).map(s => [s.id, s]));
 
-    if (ranked.length > 0) {
-      legendName = ranked[0].name || 'Unknown';
-      legendCount = ranked[0].count;
+    const segId    = parseInt(segmentId, 10);
+    const current  = currentMap.get(segId);
+    const lastYear = lastYearMap.get(segId)?.count || 0;
+    const goal     = (req.session.goals || {})[segmentId] || 0;
+
+    if (!current) {
+      return res.status(404).send('Segment not found in your recent activities.');
     }
-
-    const userId = String(req.user.id);
-    const userEntry = ranked.find(e => String(e.id) === userId);
-    userCount = userEntry ? userEntry.count : 0;
-
-    if (legendCount === 0) {
-      legendCount = userCount;
-      legendName = req.user.name;
-    }
-
-    const effortsNeeded = Math.max(0, legendCount - userCount + 1);
-    const isLegend = userCount >= legendCount;
-
-    // Get segment name
-    let segmentName = `Segment #${segmentId}`;
-    try {
-      const details = await getSegmentDetails(token, segmentId);
-      segmentName = details.name || segmentName;
-    } catch (_) {}
 
     const buffer = await generateShareCard({
-      segmentName,
-      userName: req.user.name || req.user.firstName || 'You',
-      userCount,
-      legendName,
-      legendCount,
-      effortsNeeded: isLegend ? 0 : effortsNeeded
+      segmentName: current.name,
+      userName:    req.user.firstName || req.user.name || 'You',
+      count:       current.count,
+      lastYear,
+      goal,
+      motivation:  buildMotivation(current.count, lastYear, goal)
     });
 
     res.set({
-      'Content-Type': 'image/png',
-      'Content-Disposition': `attachment; filename="local-legend-${segmentId}.png"`
+      'Content-Type':        'image/png',
+      'Content-Disposition': `attachment; filename="effort-tracker-${segmentId}.png"`
     });
     res.send(buffer);
   } catch (err) {
     console.error('[Card Error]', err.message);
-    if (err.isRateLimit) {
-      return res.status(429).send('Strava is busy. Please try again in a few minutes.');
-    }
+    if (err.isRateLimit) return res.status(429).send('Strava is busy. Try again in a minute.');
     res.status(500).send('Could not generate card. Please try again.');
   }
 });
 
-// ── Preview card inline (for the page) ───────────────────────────────────────
+// ─── Preview card inline ──────────────────────────────────────────────────────
+
 router.get('/card-preview/:segmentId', ensureValidToken, async (req, res) => {
-  const segmentId = req.params.segmentId;
+  const { segmentId } = req.params;
   const token = req.user.accessToken;
 
   try {
-    const ranked = await getSegmentLegend(token, segmentId, 90);
-    let legendName = 'Unknown';
-    let legendCount = 0;
-    let userCount = 0;
+    const [currentActivities, lastYearActivities] = await Promise.all([
+      getRecentActivities(token, 90),
+      getLastYearActivities(token, 90)
+    ]);
 
-    if (ranked.length > 0) {
-      legendName = ranked[0].name || 'Unknown';
-      legendCount = ranked[0].count;
-    }
+    const currentMap  = new Map(aggregateSegmentEfforts(currentActivities).map(s => [s.id, s]));
+    const lastYearMap = new Map(aggregateSegmentEfforts(lastYearActivities).map(s => [s.id, s]));
 
-    const userId = String(req.user.id);
-    const userEntry = ranked.find(e => String(e.id) === userId);
-    userCount = userEntry ? userEntry.count : 0;
+    const segId    = parseInt(segmentId, 10);
+    const current  = currentMap.get(segId);
+    const lastYear = lastYearMap.get(segId)?.count || 0;
+    const goal     = (req.session.goals || {})[segmentId] || 0;
 
-    if (legendCount === 0) {
-      legendCount = userCount;
-      legendName = req.user.name;
-    }
-
-    const effortsNeeded = Math.max(0, legendCount - userCount + 1);
-    const isLegend = userCount >= legendCount;
-
-    let segmentName = `Segment #${segmentId}`;
-    try {
-      const details = await getSegmentDetails(token, segmentId);
-      segmentName = details.name || segmentName;
-    } catch (_) {}
+    if (!current) return res.status(404).send('Segment not found.');
 
     const buffer = await generateShareCard({
-      segmentName,
-      userName: req.user.name || req.user.firstName || 'You',
-      userCount,
-      legendName,
-      legendCount,
-      effortsNeeded: isLegend ? 0 : effortsNeeded
+      segmentName: current.name,
+      userName:    req.user.firstName || req.user.name || 'You',
+      count:       current.count,
+      lastYear,
+      goal,
+      motivation:  buildMotivation(current.count, lastYear, goal)
     });
 
     res.set('Content-Type', 'image/png');
