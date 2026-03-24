@@ -33,6 +33,11 @@ router.get(
   }
 );
 
+// ── Privacy page ─────────────────────────────────────────────────────────────
+router.get('/privacy', (req, res) => {
+  res.render('privacy', { user: req.user || null });
+});
+
 // ── Logout ───────────────────────────────────────────────────────────────────
 // Also deauthorizes the app from Strava so the connected-athlete slot is freed.
 // This is the only way to recycle the 10-athlete sandbox limit without

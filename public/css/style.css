@@ -135,7 +135,10 @@ a { color: inherit; text-decoration: none; }
   font-size: 0.75rem;
   color: #555;
   text-align: center;
+  line-height: 1.6;
 }
+.disclaimer-link { color: var(--orange); text-decoration: none; }
+.disclaimer-link:hover { text-decoration: underline; }
 
 /* ── Navbar ──────────────────────────────────────────────────────────────── */
 .navbar {
@@ -423,12 +426,33 @@ a { color: inherit; text-decoration: none; }
 
 /* Footer */
 .footer {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   padding: 2rem 1rem;
   color: var(--text-muted);
   font-size: 0.8rem;
   border-top: 1px solid rgba(255,255,255,0.06);
 }
+.footer-divider { opacity: 0.4; }
+.footer-link { color: var(--text-muted); text-decoration: none; }
+.footer-link:hover { color: var(--orange); }
+
+/* Powered by Strava badge — required by Strava API Terms */
+.powered-by-strava {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #FC4C02;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.powered-by-strava:hover { opacity: 0.85; }
+.strava-badge-logo { width: 18px; height: 18px; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {

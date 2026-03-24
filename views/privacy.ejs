@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data &amp; Privacy – Local Legend Predictor</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .privacy-wrap {
+      max-width: 680px;
+      margin: 3rem auto;
+      padding: 0 1.5rem 4rem;
+      color: var(--text);
+    }
+    .privacy-wrap h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+    .privacy-wrap h2 {
+      font-size: 1.1rem;
+      margin: 2rem 0 0.5rem;
+      color: var(--orange);
+    }
+    .privacy-wrap p, .privacy-wrap li {
+      font-size: 0.92rem;
+      line-height: 1.75;
+      color: var(--text-muted);
+    }
+    .privacy-wrap ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+    .privacy-wrap a { color: var(--orange); }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 2rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--orange); }
+    .strava-terms-note {
+      margin-top: 2rem;
+      padding: 1rem 1.25rem;
+      border: 1px solid rgba(252,76,2,0.3);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body class="dashboard-body">
+
+  <!-- Nav -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <span class="bike-sm">🚴</span>
+        <span>Local Legend <span class="orange">Predictor</span></span>
+      </div>
+      <div class="nav-right">
+        <% if (user) { %>
+          <a href="/dashboard" class="btn-logout">Dashboard</a>
+        <% } else { %>
+          <a href="/login" class="btn-logout">Login</a>
+        <% } %>
+      </div>
+    </div>
+  </nav>
+
+  <div class="privacy-wrap">
+    <a href="<%= user ? '/dashboard' : '/login' %>" class="back-link">← Back</a>
+
+    <h1>Data &amp; Privacy</h1>
+    <p>Last updated: March 2026</p>
+
+    <h2>What data we access</h2>
+    <p>When you connect with Strava, we request read-only access to:</p>
+    <ul>
+      <li>Your public Strava profile (name, profile photo)</li>
+      <li>Your recent activity data (last 90 days) to identify your most-ridden segments</li>
+      <li>Public segment leaderboard data to compare your effort count to the current Local Legend</li>
+    </ul>
+    <p>We request the <code>read</code> and <code>activity:read_all</code> scopes. We <strong>never</strong> post, create, or modify anything on your Strava account.</p>
+
+    <h2>How data is stored</h2>
+    <p>Your Strava access token and profile are held only in your browser session (server-side session cookie). Sessions expire within 24 hours. We do not store your data in any database. When you log out, your session is destroyed and your Strava authorization is revoked immediately.</p>
+
+    <h2>Revoking access</h2>
+    <p>You can disconnect this app at any time by:</p>
+    <ul>
+      <li>Clicking <strong>Log out</strong> in the app (this also deauthorizes us from Strava)</li>
+      <li>Going to <a href="https://www.strava.com/settings/apps" target="_blank" rel="noopener">strava.com/settings/apps</a> and revoking access manually</li>
+    </ul>
+
+    <h2>Third parties</h2>
+    <p>We do not sell, share, or transfer your data to any third party. Segment leaderboard data displayed in the app is fetched live from the public Strava API and is not stored.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Reach out at <a href="mailto:troldan92@gmail.com">troldan92@gmail.com</a>.</p>
+
+    <div class="strava-terms-note">
+      This application uses the Strava API and is subject to the
+      <a href="https://www.strava.com/legal/api" target="_blank" rel="noopener">Strava API Agreement</a>.
+      This app is not affiliated with or endorsed by Strava.
+    </div>
+
+    <!-- Powered by Strava — required by Strava API Terms -->
+    <a href="https://www.strava.com" target="_blank" rel="noopener" class="powered-by-strava" style="margin-top:2rem;">
+      <svg class="strava-badge-logo" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066l-2.084 4.116z"/>
+        <path d="M11.16 8.71H8.397L15.387 0 22.377 8.71h-2.763l-4.227-5.766-4.227 5.766z"/>
+      </svg>
+      <span>Powered by Strava</span>
+    </a>
+  </div>
+
+</body>
+</html>
