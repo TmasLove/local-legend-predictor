@@ -1,13 +1,14 @@
 require('dotenv').config();
-const express = require('express');
-const session = require('express-session');
+const express  = require('express');
+const helmet   = require('helmet');
+const session  = require('express-session');
 const passport = require('passport');
 const OAuth2Strategy = require('passport-oauth2');
 const axios = require('axios');
-const path = require('path');
+const path  = require('path');
 
 // Fail fast if required env vars are missing
-const REQUIRED_ENV = ['STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET'];
+const REQUIRED_ENV = ['STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET', 'SESSION_SECRET'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
   console.error(`[Startup Error] Missing required environment variables: ${missing.join(', ')}`);
@@ -16,6 +17,13 @@ if (missing.length) {
 }
 
 const app = express();
+
+// Trust Render's reverse proxy so secure cookies work on HTTPS
+app.set('trust proxy', 1);
+
+// Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.)
+app.use(helmet());
+app.disable('x-powered-by');
 
 // View engine
 app.set('view engine', 'ejs');
@@ -30,22 +38,27 @@ app.use(express.json());
 
 // Session
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'local-legend-secret-change-me',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: {
+    maxAge:   24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
 }));
 
 // Passport init
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Strava OAuth Strategy (using passport-oauth2 directly for full params support)
+// Strava OAuth Strategy
 const stravaStrategy = new OAuth2Strategy(
   {
     authorizationURL: 'https://www.strava.com/oauth/authorize',
     tokenURL: 'https://www.strava.com/oauth/token',
-    clientID: process.env.STRAVA_CLIENT_ID,
+    clientID:    process.env.STRAVA_CLIENT_ID,
     clientSecret: process.env.STRAVA_CLIENT_SECRET,
     callbackURL: process.env.STRAVA_CALLBACK_URL || 'http://localhost:3000/auth/strava/callback',
     scope: 'read,activity:read_all',
@@ -53,16 +66,15 @@ const stravaStrategy = new OAuth2Strategy(
   },
   async (accessToken, refreshToken, params, done) => {
     try {
-      // Fetch athlete profile from Strava
       const { data: athlete } = await axios.get('https://www.strava.com/api/v3/athlete', {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       const user = {
-        id: athlete.id,
-        name: `${athlete.firstname} ${athlete.lastname}`.trim(),
+        id:        athlete.id,
+        name:      `${athlete.firstname} ${athlete.lastname}`.trim(),
         firstName: athlete.firstname,
-        lastName: athlete.lastname,
-        photo: athlete.profile_medium || athlete.profile,
+        lastName:  athlete.lastname,
+        photo:     athlete.profile_medium || athlete.profile,
         accessToken,
         refreshToken,
         expiresAt: params.expires_at
@@ -76,7 +88,7 @@ const stravaStrategy = new OAuth2Strategy(
 stravaStrategy.name = 'strava';
 passport.use(stravaStrategy);
 
-passport.serializeUser((user, done) => done(null, user));
+passport.serializeUser((user, done)   => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
 // Routes
@@ -91,16 +103,16 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// Global error handler — never expose internal error details to the browser
 app.use((err, req, res, next) => {
-  console.error('[Error]', err.message);
+  console.error('[Error]', err.message, err.stack);
   res.status(500).render('error', {
-    message: err.message || 'Something went wrong. Please try again.',
+    message: 'Something went wrong. Please try again.',
     user: req.user || null
   });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Local Legend Predictor running at http://localhost:${PORT}`);
+  console.log(`Personal Effort Tracker running at http://localhost:${PORT}`);
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Data &amp; Privacy – Local Legend Predictor</title>
+  <title>Data &amp; Privacy – Personal Effort Tracker</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     .privacy-wrap {
@@ -53,7 +53,7 @@
     <div class="nav-inner">
       <div class="nav-brand">
         <span class="bike-sm">🚴</span>
-        <span>Local Legend <span class="orange">Predictor</span></span>
+        <span>Personal <span class="orange">Effort Tracker</span></span>
       </div>
       <div class="nav-right">
         <% if (user) { %>
@@ -75,10 +75,9 @@
     <p>When you connect with Strava, we request read-only access to:</p>
     <ul>
       <li>Your public Strava profile (name, profile photo)</li>
-      <li>Your recent activity data (last 90 days) to identify your most-ridden segments</li>
-      <li>Public segment leaderboard data to compare your effort count to the current Local Legend</li>
+      <li>Your own activity data (last 90 days and the same window from last year) to count your segment efforts and show personal progress</li>
     </ul>
-    <p>We request the <code>read</code> and <code>activity:read_all</code> scopes. We <strong>never</strong> post, create, or modify anything on your Strava account.</p>
+    <p>We request the <code>read</code> and <code>activity:read_all</code> scopes. We only access <strong>your own</strong> data — no other athletes' data is fetched or displayed. We <strong>never</strong> post, create, or modify anything on your Strava account.</p>
 
     <h2>How data is stored</h2>
     <p>Your Strava access token and profile are held only in your browser session (server-side session cookie). Sessions expire within 24 hours. We do not store your data in any database. When you log out, your session is destroyed and your Strava authorization is revoked immediately.</p>
@@ -91,7 +90,7 @@
     </ul>
 
     <h2>Third parties</h2>
-    <p>We do not sell, share, or transfer your data to any third party. Segment leaderboard data displayed in the app is fetched live from the public Strava API and is not stored.</p>
+    <p>We do not sell, share, or transfer your data to any third party. No data is stored beyond your active session.</p>
 
     <h2>Contact</h2>
     <p>Questions? Reach out at <a href="mailto:troldan92@gmail.com">troldan92@gmail.com</a>.</p>

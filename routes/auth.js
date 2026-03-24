@@ -1,10 +1,10 @@
-const express = require('express');
+const express  = require('express');
 const passport = require('passport');
-const axios = require('axios');
+const axios    = require('axios');
 
 const router = express.Router();
 
-// ── Login page ──────────────────────────────────────────────────────────────
+// ── Login page ────────────────────────────────────────────────────────────────
 router.get('/login', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
   const msg = req.query.msg || null;
@@ -16,13 +16,13 @@ router.get('/', (req, res) => {
   res.redirect(req.user ? '/dashboard' : '/login');
 });
 
-// ── Strava OAuth initiation ──────────────────────────────────────────────────
+// ── Strava OAuth initiation ───────────────────────────────────────────────────
 router.get(
   '/auth/strava',
   passport.authenticate('strava', { approval_prompt: 'auto' })
 );
 
-// ── Strava OAuth callback ────────────────────────────────────────────────────
+// ── Strava OAuth callback ─────────────────────────────────────────────────────
 router.get(
   '/auth/strava/callback',
   passport.authenticate('strava', {
@@ -33,24 +33,22 @@ router.get(
   }
 );
 
-// ── Privacy page ─────────────────────────────────────────────────────────────
+// ── Privacy page ──────────────────────────────────────────────────────────────
 router.get('/privacy', (req, res) => {
   res.render('privacy', { user: req.user || null });
 });
 
-// ── Logout ───────────────────────────────────────────────────────────────────
+// ── Logout (POST — prevents CSRF logout via <img> or GET link) ────────────────
 // Also deauthorizes the app from Strava so the connected-athlete slot is freed.
-// This is the only way to recycle the 10-athlete sandbox limit without
-// going through Strava's production review process.
-router.get('/logout', async (req, res, next) => {
+router.post('/logout', async (req, res, next) => {
   const accessToken = req.user?.accessToken;
 
-  // Fire-and-forget Strava deauthorize — don't block logout if it fails
+  // Fire-and-forget Strava deauthorize — send token in request body per Strava API docs
   if (accessToken) {
     axios.post(
       'https://www.strava.com/oauth/deauthorize',
-      null,
-      { params: { access_token: accessToken } }
+      { access_token: accessToken },
+      { headers: { 'Content-Type': 'application/json' } }
     ).catch(err => {
       console.warn('[Logout] Strava deauthorize failed (slot not freed):', err.message);
     });

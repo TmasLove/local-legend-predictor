@@ -11,6 +11,12 @@ const router = express.Router();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Validate that a route param is a positive integer. Returns the integer or null. */
+function parseSegmentId(raw) {
+  const id = parseInt(raw, 10);
+  return (!isNaN(id) && id > 0) ? id : null;
+}
+
 /** Pick a motivational message based solely on the user's own data. */
 function buildMotivation(current, lastYear, goal) {
   const diff = current - lastYear;
@@ -38,7 +44,6 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
   try {
     const token = req.user.accessToken;
 
-    // Fetch current 90-day activities and same window last year in parallel
     let currentActivities, lastYearActivities;
     try {
       [currentActivities, lastYearActivities] = await Promise.all([
@@ -64,7 +69,6 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       });
     }
 
-    // Aggregate effort counts per segment (user's own data only)
     const currentMap  = new Map(
       aggregateSegmentEfforts(currentActivities).map(s => [s.id, s])
     );
@@ -82,12 +86,11 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       });
     }
 
-    // Retrieve any saved goals from session
-    const goals = req.session.goals || {};
+    const goals = req.session.goals || Object.create(null);
 
     const segments = top10.map(seg => {
       const lastYear = lastYearMap.get(seg.id)?.count || 0;
-      const goal     = goals[seg.id] || 0;
+      const goal     = goals[String(seg.id)] || 0;
       const progress = goal > 0
         ? Math.min(100, Math.round((seg.count / goal) * 100))
         : 0;
@@ -95,9 +98,9 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
       return {
         id:         seg.id,
         name:       seg.name,
-        count:      seg.count,      // current period (last 90 days)
-        lastYear,                   // same window last year
-        goal,                       // user-defined target (0 = not set)
+        count:      seg.count,
+        lastYear,
+        goal,
         progress,
         motivation: buildMotivation(seg.count, lastYear, goal)
       };
@@ -123,15 +126,19 @@ router.get('/dashboard', ensureValidToken, async (req, res) => {
 // ─── Save / update goal for a segment ────────────────────────────────────────
 
 router.post('/goals/:segmentId', ensureValidToken, (req, res) => {
-  const { segmentId } = req.params;
+  const segId = parseSegmentId(req.params.segmentId);
+  if (!segId) return res.status(400).send('Invalid segment ID.');
+
+  const segKey = String(segId);
   const target = parseInt(req.body.target, 10);
 
-  if (!req.session.goals) req.session.goals = {};
+  // Use a null-prototype object to prevent prototype pollution
+  if (!req.session.goals) req.session.goals = Object.create(null);
 
-  if (!isNaN(target) && target > 0) {
-    req.session.goals[segmentId] = target;
+  if (!isNaN(target) && target > 0 && target <= 9999) {
+    req.session.goals[segKey] = target;
   } else {
-    delete req.session.goals[segmentId]; // clear goal if 0 or invalid
+    delete req.session.goals[segKey];
   }
 
   req.session.save(() => res.redirect('/dashboard'));
@@ -140,7 +147,9 @@ router.post('/goals/:segmentId', ensureValidToken, (req, res) => {
 // ─── Shareable PNG card ───────────────────────────────────────────────────────
 
 router.get('/card/:segmentId', ensureValidToken, async (req, res) => {
-  const { segmentId } = req.params;
+  const segId = parseSegmentId(req.params.segmentId);
+  if (!segId) return res.status(400).send('Invalid segment ID.');
+
   const token = req.user.accessToken;
 
   try {
@@ -152,14 +161,11 @@ router.get('/card/:segmentId', ensureValidToken, async (req, res) => {
     const currentMap  = new Map(aggregateSegmentEfforts(currentActivities).map(s => [s.id, s]));
     const lastYearMap = new Map(aggregateSegmentEfforts(lastYearActivities).map(s => [s.id, s]));
 
-    const segId    = parseInt(segmentId, 10);
     const current  = currentMap.get(segId);
     const lastYear = lastYearMap.get(segId)?.count || 0;
-    const goal     = (req.session.goals || {})[segmentId] || 0;
+    const goal     = (req.session.goals || {})[String(segId)] || 0;
 
-    if (!current) {
-      return res.status(404).send('Segment not found in your recent activities.');
-    }
+    if (!current) return res.status(404).send('Segment not found in your recent activities.');
 
     const buffer = await generateShareCard({
       segmentName: current.name,
@@ -172,7 +178,7 @@ router.get('/card/:segmentId', ensureValidToken, async (req, res) => {
 
     res.set({
       'Content-Type':        'image/png',
-      'Content-Disposition': `attachment; filename="effort-tracker-${segmentId}.png"`
+      'Content-Disposition': `attachment; filename="effort-tracker-${segId}.png"`
     });
     res.send(buffer);
   } catch (err) {
@@ -185,7 +191,9 @@ router.get('/card/:segmentId', ensureValidToken, async (req, res) => {
 // ─── Preview card inline ──────────────────────────────────────────────────────
 
 router.get('/card-preview/:segmentId', ensureValidToken, async (req, res) => {
-  const { segmentId } = req.params;
+  const segId = parseSegmentId(req.params.segmentId);
+  if (!segId) return res.status(400).send('Invalid segment ID.');
+
   const token = req.user.accessToken;
 
   try {
@@ -197,10 +205,9 @@ router.get('/card-preview/:segmentId', ensureValidToken, async (req, res) => {
     const currentMap  = new Map(aggregateSegmentEfforts(currentActivities).map(s => [s.id, s]));
     const lastYearMap = new Map(aggregateSegmentEfforts(lastYearActivities).map(s => [s.id, s]));
 
-    const segId    = parseInt(segmentId, 10);
     const current  = currentMap.get(segId);
     const lastYear = lastYearMap.get(segId)?.count || 0;
-    const goal     = (req.session.goals || {})[segmentId] || 0;
+    const goal     = (req.session.goals || {})[String(segId)] || 0;
 
     if (!current) return res.status(404).send('Segment not found.');
 

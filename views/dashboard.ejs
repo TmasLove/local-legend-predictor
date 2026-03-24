@@ -20,7 +20,9 @@
           <img class="avatar" src="<%= user.photo %>" alt="<%= user.name %>">
         <% } %>
         <span class="nav-name"><%= user ? user.firstName || user.name : '' %></span>
-        <a href="/logout" class="btn-logout">Log out</a>
+        <form method="POST" action="/logout" style="display:inline;">
+          <button type="submit" class="btn-logout">Log out</button>
+        </form>
       </div>
     </div>
   </nav>
